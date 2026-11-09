@@ -57,12 +57,6 @@ fn get_window_status() -> (bool, bool) {
 }
 
 fn main() -> eframe::Result<()> {
-    #[cfg(windows)]
-    unsafe {
-        use windows::Win32::System::Console::FreeConsole;
-        let _ = FreeConsole();
-    }
-
     std::panic::set_hook(Box::new(|info| {
         let msg = format!("Panic: {}\nBacktrace: {:?}", info, std::backtrace::Backtrace::capture());
         let _ = std::fs::write("panic.txt", msg);
@@ -72,16 +66,25 @@ fn main() -> eframe::Result<()> {
     #[cfg(windows)]
     let _single_instance_mutex = unsafe {
         use windows::Win32::System::Threading::CreateMutexW;
-        use windows::Win32::Foundation::{GetLastError, SetLastError, WIN32_ERROR, ERROR_ALREADY_EXISTS};
-        use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, ShowWindow, SetForegroundWindow, SW_RESTORE};
+        use windows::Win32::Foundation::{GetLastError, SetLastError, WIN32_ERROR, ERROR_ALREADY_EXISTS, WPARAM, LPARAM};
+        use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, PostMessageW, ShowWindow, SetForegroundWindow, SW_RESTORE, SW_SHOW, WM_COMMAND};
         use windows::core::w;
 
         SetLastError(WIN32_ERROR(0));
         let handle_res = CreateMutexW(None, true, w!("Local\\EasySMX_X05_Suite_SingleInstance"));
         if let Ok(handle) = handle_res {
-            if GetLastError() == ERROR_ALREADY_EXISTS {
+            let last_err = GetLastError();
+            if last_err == ERROR_ALREADY_EXISTS {
+                // 1. Post command to existing tray window to unhide egui viewport
+                let tray_hwnd = FindWindowW(w!("EasySMX_X05_Tray_Class"), None).unwrap_or_default();
+                if !tray_hwnd.is_invalid() && !tray_hwnd.0.is_null() {
+                    let _ = PostMessageW(tray_hwnd, WM_COMMAND, WPARAM(2001), LPARAM(0));
+                }
+
+                // 2. Also directly restore and bring the main window to front
                 if let Ok(hwnd) = FindWindowW(None, w!("EasySMX X05 Pro - Gamepad Suite & Optimizer")) {
-                    if !hwnd.0.is_null() {
+                    if !hwnd.is_invalid() && !hwnd.0.is_null() {
+                        let _ = ShowWindow(hwnd, SW_SHOW);
                         let _ = ShowWindow(hwnd, SW_RESTORE);
                         let _ = SetForegroundWindow(hwnd);
                     }
@@ -155,6 +158,7 @@ pub struct SuiteApp {
     pub last_minimized_state: bool,
     pub window_hidden: bool,
     pub vibration_until: Option<Instant>,
+    pub startup_time: Instant,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -324,6 +328,7 @@ impl SuiteApp {
             last_minimized_state: false,
             window_hidden: false,
             vibration_until: None,
+            startup_time: Instant::now(),
         }
     }
 
@@ -418,7 +423,9 @@ impl eframe::App for SuiteApp {
         }
 
         // Determine OS window state: Focused vs Background vs Minimized
-        let (is_focused, is_minimized) = get_window_status();
+        let (is_focused_raw, is_minimized) = get_window_status();
+        let is_recent_startup = self.startup_time.elapsed() < Duration::from_secs(3);
+        let is_focused = is_focused_raw || is_recent_startup;
         let is_hidden_or_minimized = self.window_hidden || is_minimized;
         let is_active = !is_hidden_or_minimized && is_focused;
         self.is_app_active.store(is_active, Ordering::Relaxed);

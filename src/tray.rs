@@ -251,16 +251,19 @@ unsafe extern "system" fn tray_wnd_proc(
     const WM_TRAY_CALLBACK: u32 = WM_APP + 101;
     const IDM_OPEN: usize = 2001;
     const IDM_EXIT: usize = 2002;
+    const NIN_SELECT: u32 = 0x0400;
+    const NIN_KEYSELECT: u32 = 0x0401;
+    const WM_CONTEXTMENU: u32 = 0x007B;
 
     match msg {
         WM_TRAY_CALLBACK => {
             let event = (lparam.0 & 0xFFFF) as u32;
             match event {
-                WM_LBUTTONUP | WM_LBUTTONDBLCLK => {
+                WM_LBUTTONUP | WM_LBUTTONDBLCLK | NIN_SELECT | NIN_KEYSELECT => {
                     restore_main_window();
                     TRAY_SHOW_REQUEST.store(true, Ordering::SeqCst);
                 }
-                WM_RBUTTONUP => {
+                WM_RBUTTONUP | WM_CONTEXTMENU => {
                     let mut pt = POINT::default();
                     let _ = GetCursorPos(&mut pt);
                     let _ = SetForegroundWindow(hwnd);
@@ -304,11 +307,11 @@ unsafe extern "system" fn tray_wnd_proc(
             LRESULT(0)
         }
         WM_COMMAND => {
-            let id = wparam.0 & 0xFFFF;
-            if id == 2001 {
+            let id = (wparam.0 & 0xFFFF) as usize;
+            if id == IDM_OPEN {
                 restore_main_window();
                 TRAY_SHOW_REQUEST.store(true, Ordering::SeqCst);
-            } else if id == 2002 {
+            } else if id == IDM_EXIT {
                 delete_tray_icon(hwnd);
                 std::process::exit(0);
             }
