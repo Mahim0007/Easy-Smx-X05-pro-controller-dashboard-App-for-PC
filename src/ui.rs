@@ -163,42 +163,6 @@ pub fn render_ui(app: &mut SuiteApp, ctx: &egui::Context) {
             nav_button(ui, &mut app.active_tab, Tab::DesktopMode, NavIcon::DesktopMouse, "Desktop Mouse");
             nav_button(ui, &mut app.active_tab, Tab::Settings, NavIcon::Settings, "Settings & Sys");
             nav_button(ui, &mut app.active_tab, Tab::EasySMXGuide, NavIcon::Guide, "Hardware Guide");
-
-            ui.add_space(16.0);
-
-            // Bottom Device Info Card
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.add_space(4.0);
-                egui::Frame::none()
-                    .fill(Color32::from_rgb(16, 22, 32))
-                    .stroke(Stroke::new(1.0_f32, Color32::from_rgb(28, 38, 56)))
-                    .rounding(egui::Rounding::same(8.0))
-                    .inner_margin(8.0)
-                    .show(ui, |ui| {
-                        ui.label(
-                            egui::RichText::new("EasySMX X05 Pro")
-                                .strong()
-                                .size(12.0)
-                                .color(Color32::WHITE),
-                        );
-                        ui.add_space(2.0);
-                        ui.label(
-                            egui::RichText::new("[+] Hall-Effect Sensors")
-                                .small()
-                                .color(Color32::from_rgb(0, 210, 255)),
-                        );
-                        ui.label(
-                            egui::RichText::new("[+] 1000Hz Ultra Polling")
-                                .small()
-                                .color(Color32::from_rgb(0, 245, 140)),
-                        );
-                        ui.label(
-                            egui::RichText::new("[+] RAM: ~18 MB (Lean)")
-                                .small()
-                                .color(Color32::from_rgb(85, 100, 120)),
-                        );
-                    });
-            });
         });
 
     // ----------------------------------------------------
