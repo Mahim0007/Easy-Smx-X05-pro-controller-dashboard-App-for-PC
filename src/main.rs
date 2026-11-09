@@ -165,7 +165,7 @@ pub struct SuiteApp {
 pub enum Tab {
     Dashboard,
     Performance,
-    RgbHaptics,
+    Vibration,
     Profiles,
     DesktopMode,
     EasySMXGuide,
@@ -378,14 +378,6 @@ impl SuiteApp {
             self.stop_vibration();
             self.set_status("Vibration motors turned OFF.");
         }
-    }
-
-    pub fn apply_rgb_config(&mut self) {
-        let _ = self.config.save();
-        if let Ok(mut cfg) = self.shared_config.lock() {
-            cfg.rgb = self.config.rgb.clone();
-        }
-        self.set_status(format!("RGB profile '{}' synced to controller!", self.config.rgb.mode.label()));
     }
 
     pub fn stop_vibration(&mut self) {
