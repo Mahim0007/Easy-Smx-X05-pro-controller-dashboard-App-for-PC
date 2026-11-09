@@ -187,41 +187,46 @@ impl AppConfig {
 
     pub fn apply_profile(&mut self, profile_name: &str) {
         self.active_profile = profile_name.to_string();
-        match profile_name {
-            "Zelda: Breath of the Wild / TotK" => {
-                // Optimized for Zelda: smooth camera, generous deadzone for bow aiming
-                self.hair_triggers = true;
-                self.hair_trigger_threshold = 0.05; // Instant bow firing & shield parry
-                self.left_deadzone = 0.05;
-                self.right_deadzone = 0.04;
-                self.stick_curve = CurveType::Smooth;
-                self.desktop_mouse_mode = false;
-            }
-            "Competitive Shooter (FPS)" => {
-                // Ultra instant triggers, minimal deadzones, aggressive stick response
-                self.hair_triggers = true;
-                self.hair_trigger_threshold = 0.02;
-                self.left_deadzone = 0.03;
-                self.right_deadzone = 0.03;
-                self.stick_curve = CurveType::Aggressive;
-                self.desktop_mouse_mode = false;
-            }
-            "Racing / Sim Driving" => {
-                // Linear trigger travel for precise acceleration/braking
-                self.hair_triggers = false;
-                self.left_deadzone = 0.08;
-                self.right_deadzone = 0.08;
-                self.stick_curve = CurveType::Linear;
-                self.desktop_mouse_mode = false;
-            }
-            _ => {
-                // Default Balanced
-                self.hair_triggers = false;
-                self.hair_trigger_threshold = 0.06;
-                self.left_deadzone = 0.06;
-                self.right_deadzone = 0.06;
-                self.stick_curve = CurveType::Linear;
-            }
+        if profile_name.contains("FIFA") || profile_name.contains("FC") || profile_name.contains("FOOTBALL") {
+            // Competitive FIFA / EA Sports FC Esports Profile
+            self.hair_triggers = false;          // Progressive triggers for controlled sprint & jockey pacing
+            self.hair_trigger_threshold = 0.08;
+            self.left_deadzone = 0.025;          // 2.5% ultra-agile Left Stick Dribbling & rapid directional pivots
+            self.right_deadzone = 0.03;          // 3.0% snappy Right Stick skill moves & RS player switching
+            self.stick_curve = CurveType::Linear;// 1:1 true direct pass & shot aim
+            self.polling_rate_hz = 1000;         // 1000 Hz zero-input-delay for online FUT Champions & Rivals
+            self.vibration_mode = VibrationMode::Medium;
+            self.desktop_mouse_mode = false;
+        } else if profile_name.contains("Zelda") {
+            // Optimized for Zelda: smooth camera, generous deadzone for bow aiming
+            self.hair_triggers = true;
+            self.hair_trigger_threshold = 0.05; // Instant bow firing & shield parry
+            self.left_deadzone = 0.05;
+            self.right_deadzone = 0.04;
+            self.stick_curve = CurveType::Smooth;
+            self.desktop_mouse_mode = false;
+        } else if profile_name.contains("Shooter") || profile_name.contains("FPS") {
+            // Ultra instant triggers, minimal deadzones, aggressive stick response
+            self.hair_triggers = true;
+            self.hair_trigger_threshold = 0.02;
+            self.left_deadzone = 0.03;
+            self.right_deadzone = 0.03;
+            self.stick_curve = CurveType::Aggressive;
+            self.desktop_mouse_mode = false;
+        } else if profile_name.contains("Racing") {
+            // Linear trigger travel for precise acceleration/braking
+            self.hair_triggers = false;
+            self.left_deadzone = 0.08;
+            self.right_deadzone = 0.08;
+            self.stick_curve = CurveType::Linear;
+            self.desktop_mouse_mode = false;
+        } else {
+            // Default Balanced Console
+            self.hair_triggers = false;
+            self.hair_trigger_threshold = 0.06;
+            self.left_deadzone = 0.06;
+            self.right_deadzone = 0.06;
+            self.stick_curve = CurveType::Linear;
         }
     }
 

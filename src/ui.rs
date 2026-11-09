@@ -1138,6 +1138,25 @@ fn render_rgb_haptics(app: &mut SuiteApp, ui: &mut egui::Ui, current_time: f64) 
 
             // Draw interactive controller visualizer silhouette with glowing LED rings and side light strips
             draw_controller_lighting_canvas(ui, live_rgb, app.controller.connected, current_time);
+
+            ui.add_space(8.0);
+
+            // Hardware architecture clarification notice
+            egui::Frame::none()
+                .fill(Color32::from_rgb(28, 22, 10))
+                .stroke(Stroke::new(1.0_f32, Color32::from_rgb(240, 175, 30)))
+                .rounding(egui::Rounding::same(8.0))
+                .inner_margin(egui::Margin::symmetric(10.0, 6.0))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new("💡 Hardware Note:").strong().size(12.0).color(Color32::from_rgb(255, 195, 40)));
+                        ui.label(
+                            egui::RichText::new("EasySMX X05 Pro's physical LED colors are hardwired to the internal controller MCU. Use hardware button 'FN + D-Pad Right' to cycle physical colors, and use this studio to customize your app visualizer theme.")
+                                .size(11.5)
+                                .color(Color32::from_rgb(225, 215, 185)),
+                        );
+                    });
+                });
         });
 
     ui.add_space(12.0);
@@ -1602,6 +1621,9 @@ fn render_profiles(app: &mut SuiteApp, ui: &mut egui::Ui) {
                     );
                     if ui.add(deact_btn).clicked() {
                         app.config.deactivate_profile();
+                        if let Ok(mut cfg) = app.shared_config.lock() {
+                            *cfg = app.config.clone();
+                        }
                         let _ = app.config.save();
                         app.set_status("Profile deactivated. Restored default settings.");
                     }
@@ -1612,10 +1634,26 @@ fn render_profiles(app: &mut SuiteApp, ui: &mut egui::Ui) {
     ui.add_space(10.0);
 
     let profiles = [
-        ("[ RPG / ACTION ] Zelda: Breath of the Wild / TotK", "Smooth S-curve thumbstick response for archery aiming, Instant digital hair-triggers for quick parrying."),
-        ("[ FPS ESPORTS ] Competitive Shooter (Apex / COD / Valorant)", "Ultra-low 2% deadzones, aggressive exponential response curve, instant hair-trigger firing."),
-        ("[ RACING SIM ] Sim Driving (Forza / F1)", "Nuanced progressive linear trigger inputs for precise throttle and brake modulation."),
-        ("[ CONSOLE ] Balanced Console Default", "Standard 1:1 console response curve and balanced deadzones."),
+        (
+            "[ FOOTBALL ESPORTS ] EA Sports FC / FIFA (FUT Champs & Seasons)",
+            "Ultra-sharp 2.5% LS dribbling deadzone, responsive RS skill-move flicking, and progressive sprint triggers for controlled acceleration.",
+        ),
+        (
+            "[ FPS ESPORTS ] Competitive Shooter (Apex / COD / Valorant)",
+            "Ultra-low 2% deadzones, aggressive exponential response curve, instant hair-trigger firing.",
+        ),
+        (
+            "[ RPG / ACTION ] Zelda: Breath of the Wild / TotK",
+            "Smooth S-curve thumbstick response for archery aiming, Instant digital hair-triggers for quick parrying.",
+        ),
+        (
+            "[ RACING SIM ] Sim Driving (Forza / F1)",
+            "Nuanced progressive linear trigger inputs for precise throttle and brake modulation.",
+        ),
+        (
+            "[ CONSOLE ] Balanced Console Default",
+            "Standard 1:1 console response curve and balanced deadzones.",
+        ),
     ];
 
     for (name, desc) in profiles {
@@ -1663,6 +1701,10 @@ fn render_profiles(app: &mut SuiteApp, ui: &mut egui::Ui) {
 
                             if ui.add(apply_btn).clicked() {
                                 app.config.apply_profile(name);
+                                app.target_hz.store(app.config.polling_rate_hz, std::sync::atomic::Ordering::Relaxed);
+                                if let Ok(mut cfg) = app.shared_config.lock() {
+                                    *cfg = app.config.clone();
+                                }
                                 let _ = app.config.save();
                                 app.set_status(format!("Activated preset: {}", name));
                             }

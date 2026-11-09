@@ -82,6 +82,16 @@ flowchart TD
 - **Instant Haptic Pulse Test:** One-click `⚡ Test Haptic Pulse (450ms)` button sends an immediate non-blocking test rumble to the controller motors.
 - **Non-blocking Cutoff:** Managed via high-precision hardware timestamps to prevent motor lockups.
 
+### ⚽ Pro Game Profiles & Esports Tunings
+- **[ FOOTBALL ESPORTS ] EA Sports FC / FIFA (FUT Champs & Seasons):**
+  - Ultra-sharp **2.5% Left Stick dribbling deadzone** for instant 360-degree body feints, agile stepovers, and rapid directional pivots.
+  - Snappy **3.0% Right Stick deadzone** for responsive 5-star skill moves (Elastico, Roulette, Heel-to-Heel) and fast manual player switching in defense.
+  - Progressive analog sprint & jockey triggers (`RT` Sprint / `LT` Jockey) to prevent accidental ball over-touches.
+  - **1000 Hz zero-input-delay** polling to eliminate online delay in FUT Champions & Rivals.
+- **[ FPS ESPORTS ] Competitive Shooter (Apex / COD / Valorant):** 2% micro-deadzones, instant hair-trigger firing, aggressive stick curve.
+- **[ RPG / ACTION ] Zelda / Elden Ring:** Smooth S-curve archery aiming, fast parrying.
+- **[ RACING SIM ] Forza / F1:** Progressive linear trigger travel for throttle and trail-braking.
+
 ### 🕹️ Hall-Effect Anti-Drift Radar & Stick Circularity
 - Real-time oscilloscope-style crosshair radar for both Left and Right Hall-Effect sticks.
 - Micro-deadzone calibration (default 6% avoids power drain while providing instant analog control).
