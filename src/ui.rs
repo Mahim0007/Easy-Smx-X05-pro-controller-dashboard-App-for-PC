@@ -1,4 +1,4 @@
-use crate::config::CurveType;
+use crate::config::{CurveType, RgbMode, VibrationMode};
 use crate::controller::{BatteryStatus, ConnectionMode};
 use crate::startup;
 use crate::updater::{AutoUpdater, UpdateStatus};
@@ -9,6 +9,7 @@ use eframe::egui::{self, Color32, Pos2, Stroke, Vec2};
 pub enum NavIcon {
     Dashboard,
     Performance,
+    RgbHaptics,
     Profiles,
     DesktopMouse,
     Settings,
@@ -157,6 +158,7 @@ pub fn render_ui(app: &mut SuiteApp, ctx: &egui::Context) {
 
             nav_button(ui, &mut app.active_tab, Tab::Dashboard, NavIcon::Dashboard, "Dashboard");
             nav_button(ui, &mut app.active_tab, Tab::Performance, NavIcon::Performance, "Performance");
+            nav_button(ui, &mut app.active_tab, Tab::RgbHaptics, NavIcon::RgbHaptics, "RGB & Vibration");
             nav_button(ui, &mut app.active_tab, Tab::Profiles, NavIcon::Profiles, "Game Profiles");
             nav_button(ui, &mut app.active_tab, Tab::DesktopMode, NavIcon::DesktopMouse, "Desktop Mouse");
             nav_button(ui, &mut app.active_tab, Tab::Settings, NavIcon::Settings, "Settings & Sys");
@@ -237,6 +239,7 @@ pub fn render_ui(app: &mut SuiteApp, ctx: &egui::Context) {
                     match app.active_tab {
                         Tab::Dashboard => render_dashboard(app, ui, current_time),
                         Tab::Performance => render_performance(app, ui),
+                        Tab::RgbHaptics => render_rgb_haptics(app, ui, current_time),
                         Tab::Profiles => render_profiles(app, ui),
                         Tab::DesktopMode => render_desktop_mode(app, ui),
                         Tab::Settings => render_settings(app, ui),
@@ -275,6 +278,15 @@ fn draw_nav_icon(painter: &egui::Painter, center: Pos2, icon: NavIcon, color: Co
             painter.line_segment([p4, p5], stroke);
             painter.line_segment([p5, p6], stroke);
             painter.line_segment([p6, p1], stroke);
+        }
+        NavIcon::RgbHaptics => {
+            // Glowing LED bulb with radiating light beams and vibration pulse
+            painter.circle_stroke(Pos2::new(center.x, center.y - 1.0), 3.8, stroke);
+            painter.circle_filled(Pos2::new(center.x, center.y - 1.0), 2.0, color);
+            painter.line_segment([Pos2::new(center.x - 2.0, center.y + 3.2), Pos2::new(center.x + 2.0, center.y + 3.2)], Stroke::new(1.2_f32, color));
+            painter.line_segment([Pos2::new(center.x - 5.5, center.y - 1.0), Pos2::new(center.x - 4.2, center.y - 1.0)], Stroke::new(1.0_f32, color));
+            painter.line_segment([Pos2::new(center.x + 4.2, center.y - 1.0), Pos2::new(center.x + 5.5, center.y - 1.0)], Stroke::new(1.0_f32, color));
+            painter.line_segment([Pos2::new(center.x, center.y - 5.5), Pos2::new(center.x, center.y - 4.2)], Stroke::new(1.0_f32, color));
         }
         NavIcon::Profiles => {
             // Controller D-Pad cross
@@ -556,6 +568,13 @@ fn nav_button(ui: &mut egui::Ui, current_tab: &mut Tab, target_tab: Tab, icon: N
 // DASHBOARD (Elite Commercial Peripheral Suite Look)
 // ----------------------------------------------------
 fn render_dashboard(app: &mut SuiteApp, ui: &mut egui::Ui, current_time: f64) {
+    let live_rgb = compute_rgb_color(
+        &app.config.rgb,
+        current_time,
+        app.controller.left_trigger,
+        app.controller.right_trigger,
+        app.controller.left_magnitude.max(app.controller.right_magnitude),
+    );
     // TOP HERO METRIC CARDS (Using 3 isolated columns)
     ui.columns(3, |cols| {
         // Column 0: Connection Protocol & Link
@@ -673,7 +692,7 @@ fn render_dashboard(app: &mut SuiteApp, ui: &mut egui::Ui, current_time: f64) {
                     stick_cols[0].vertical_centered(|ui| {
                         ui.label(egui::RichText::new("Left Stick (LS)").strong().size(11.0).color(Color32::from_rgb(190, 205, 225)));
                         ui.add_space(2.0);
-                        draw_stick_radar(ui, app.controller.left_stick_x, app.controller.left_stick_y, app.config.left_deadzone, current_time);
+                        draw_stick_radar(ui, app.controller.left_stick_x, app.controller.left_stick_y, app.config.left_deadzone, current_time, live_rgb);
                         ui.add_space(3.0);
                         ui.label(
                             egui::RichText::new(format!("X:{:+.2} Y:{:+.2}", app.controller.left_stick_x, app.controller.left_stick_y))
@@ -693,7 +712,7 @@ fn render_dashboard(app: &mut SuiteApp, ui: &mut egui::Ui, current_time: f64) {
                     stick_cols[1].vertical_centered(|ui| {
                         ui.label(egui::RichText::new("Right Stick (RS)").strong().size(11.0).color(Color32::from_rgb(190, 205, 225)));
                         ui.add_space(2.0);
-                        draw_stick_radar(ui, app.controller.right_stick_x, app.controller.right_stick_y, app.config.right_deadzone, current_time);
+                        draw_stick_radar(ui, app.controller.right_stick_x, app.controller.right_stick_y, app.config.right_deadzone, current_time, live_rgb);
                         ui.add_space(3.0);
                         ui.label(
                             egui::RichText::new(format!("X:{:+.2} Y:{:+.2}", app.controller.right_stick_x, app.controller.right_stick_y))
@@ -1047,6 +1066,489 @@ fn render_performance(app: &mut SuiteApp, ui: &mut egui::Ui) {
 }
 
 // ----------------------------------------------------
+// RGB & VIBRATION HAPTICS STUDIO TAB
+// ----------------------------------------------------
+fn render_rgb_haptics(app: &mut SuiteApp, ui: &mut egui::Ui, current_time: f64) {
+    let live_rgb = compute_rgb_color(
+        &app.config.rgb,
+        current_time,
+        app.controller.left_trigger,
+        app.controller.right_trigger,
+        app.controller.left_magnitude.max(app.controller.right_magnitude),
+    );
+
+    ui.horizontal(|ui| {
+        ui.label(
+            egui::RichText::new("RGB Lighting & Dual-Motor Haptics")
+                .strong()
+                .size(20.0)
+                .color(Color32::WHITE),
+        );
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let badge = egui::Frame::none()
+                .fill(Color32::from_rgb(16, 28, 44))
+                .stroke(Stroke::new(1.0_f32, live_rgb))
+                .rounding(egui::Rounding::same(8.0))
+                .inner_margin(egui::Margin::symmetric(10.0, 3.0));
+            badge.show(ui, |ui| {
+                ui.label(
+                    egui::RichText::new(format!("[*] {}", app.config.rgb.mode.label()))
+                        .size(11.0)
+                        .strong()
+                        .color(live_rgb),
+                );
+            });
+        });
+    });
+    ui.add_space(2.0);
+    ui.label(
+        egui::RichText::new("Full RGB illumination studio & 3-tier haptic vibration motor control for EasySMX X05 Pro.")
+            .size(13.0)
+            .color(Color32::from_rgb(175, 190, 215)),
+    );
+    ui.add_space(12.0);
+
+    // ----------------------------------------------------
+    // SECTION 1: LIVE CONTROLLER LIGHTING VISUALIZER STUDIO
+    // ----------------------------------------------------
+    egui::Frame::none()
+        .fill(Color32::from_rgb(14, 18, 27))
+        .stroke(Stroke::new(1.0_f32, Color32::from_rgb(26, 35, 52)))
+        .rounding(egui::Rounding::same(10.0))
+        .inner_margin(14.0)
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("Hardware Illumination Studio")
+                        .strong()
+                        .size(14.5)
+                        .color(Color32::WHITE),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(
+                        egui::RichText::new(format!("Hex: #{:02X}{:02X}{:02X}", app.config.rgb.red, app.config.rgb.green, app.config.rgb.blue))
+                            .monospace()
+                            .strong()
+                            .size(11.5)
+                            .color(live_rgb),
+                    );
+                });
+            });
+            ui.add_space(6.0);
+
+            // Draw interactive controller visualizer silhouette with glowing LED rings and side light strips
+            draw_controller_lighting_canvas(ui, live_rgb, app.controller.connected, current_time);
+        });
+
+    ui.add_space(12.0);
+
+    // ----------------------------------------------------
+    // SECTION 2: RGB LIGHTING CONTROLS (Modes, Colors, Brightness)
+    // ----------------------------------------------------
+    egui::Frame::none()
+        .fill(Color32::from_rgb(14, 18, 27))
+        .stroke(Stroke::new(1.0_f32, Color32::from_rgb(26, 35, 52)))
+        .rounding(egui::Rounding::same(10.0))
+        .inner_margin(14.0)
+        .show(ui, |ui| {
+            ui.label(
+                egui::RichText::new("RGB Mode Selection")
+                    .strong()
+                    .size(14.5)
+                    .color(Color32::from_rgb(0, 220, 255)),
+            );
+            ui.add_space(4.0);
+
+            ui.horizontal_wrapped(|ui| {
+                let modes = [
+                    (RgbMode::Rainbow, "Rainbow Wave (Spectrum)"),
+                    (RgbMode::Breathing, "Breathing Pulse (Fade)"),
+                    (RgbMode::Static, "Static Color (Solid)"),
+                    (RgbMode::Reactive, "Input Reactive (Haptic Sync)"),
+                    (RgbMode::Off, "Lights Off (Stealth)"),
+                ];
+
+                for (mode, label) in modes {
+                    let is_sel = app.config.rgb.mode == mode;
+                    let fill = if is_sel { Color32::from_rgb(18, 38, 60) } else { Color32::from_rgb(18, 24, 34) };
+                    let border = if is_sel { live_rgb } else { Color32::from_rgb(32, 44, 64) };
+                    let txt_col = if is_sel { Color32::WHITE } else { Color32::from_rgb(165, 180, 205) };
+
+                    let btn = egui::Button::new(egui::RichText::new(label).strong().size(12.5).color(txt_col))
+                        .fill(fill)
+                        .stroke(Stroke::new(if is_sel { 1.5_f32 } else { 1.0_f32 }, border))
+                        .rounding(egui::Rounding::same(7.0))
+                        .min_size(Vec2::new(140.0, 32.0));
+
+                    if ui.add(btn).clicked() {
+                        app.config.rgb.mode = mode;
+                        app.apply_rgb_config();
+                    }
+                }
+            });
+
+            ui.add_space(12.0);
+
+            // Palette Presets
+            ui.label(
+                egui::RichText::new("Color Palette Presets")
+                    .strong()
+                    .size(13.0)
+                    .color(Color32::from_rgb(200, 215, 235)),
+            );
+            ui.add_space(4.0);
+
+            ui.horizontal_wrapped(|ui| {
+                let presets = [
+                    ("Neon Cyan", 0, 210, 255),
+                    ("Cyber Red", 255, 45, 75),
+                    ("Royal Purple", 160, 60, 255),
+                    ("Emerald Green", 0, 245, 140),
+                    ("Electric Gold", 255, 205, 20),
+                    ("Sunset Orange", 255, 110, 20),
+                    ("Polar White", 255, 255, 255),
+                ];
+
+                for (name, r, g, b) in presets {
+                    let col = Color32::from_rgb(r, g, b);
+                    let is_active = app.config.rgb.red == r && app.config.rgb.green == g && app.config.rgb.blue == b;
+
+                    let btn = egui::Button::new(
+                        egui::RichText::new(name)
+                            .strong()
+                            .size(11.5)
+                            .color(if is_active { Color32::WHITE } else { Color32::from_rgb(200, 210, 225) }),
+                    )
+                    .fill(if is_active { Color32::from_rgb(28, 40, 58) } else { Color32::from_rgb(16, 22, 32) })
+                    .stroke(Stroke::new(if is_active { 1.6_f32 } else { 1.0_f32 }, col))
+                    .rounding(egui::Rounding::same(6.0))
+                    .min_size(Vec2::new(100.0, 28.0));
+
+                    if ui.add(btn).clicked() {
+                        app.config.rgb.red = r;
+                        app.config.rgb.green = g;
+                        app.config.rgb.blue = b;
+                        if app.config.rgb.mode == RgbMode::Off {
+                            app.config.rgb.mode = RgbMode::Static;
+                        }
+                        app.apply_rgb_config();
+                    }
+                }
+            });
+
+            ui.add_space(12.0);
+
+            // Detailed Sliders: Brightness, Speed, Custom RGB channels
+            ui.columns(2, |cols| {
+                // Left Column: Brightness & Animation Speed
+                cols[0].vertical(|ui| {
+                    ui.label(egui::RichText::new("LED Brightness").strong().size(12.5).color(Color32::from_rgb(190, 205, 225)));
+                    let mut b_pct = (app.config.rgb.brightness * 100.0).round() as u32;
+                    let b_slider = egui::Slider::new(&mut b_pct, 0..=100)
+                        .suffix("%")
+                        .text("Level");
+                    if ui.add(b_slider).changed() {
+                        app.config.rgb.brightness = b_pct as f32 / 100.0;
+                        let _ = app.config.save();
+                    }
+
+                    ui.add_space(8.0);
+                    ui.label(egui::RichText::new("Animation Cycle Speed").strong().size(12.5).color(Color32::from_rgb(190, 205, 225)));
+                    let speed_slider = egui::Slider::new(&mut app.config.rgb.speed, 0.5..=2.5)
+                        .suffix("x")
+                        .text("Speed");
+                    if ui.add(speed_slider).changed() {
+                        let _ = app.config.save();
+                    }
+                });
+
+                // Right Column: Fine Red, Green, Blue Channels
+                cols[1].vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new("Custom Channels:").strong().size(12.5).color(Color32::from_rgb(190, 205, 225)));
+                        let swatch_rect = egui::Rect::from_min_size(ui.cursor().min, Vec2::new(28.0, 14.0));
+                        ui.painter().rect_filled(swatch_rect, egui::Rounding::same(3.0), Color32::from_rgb(app.config.rgb.red, app.config.rgb.green, app.config.rgb.blue));
+                        ui.painter().rect_stroke(swatch_rect, egui::Rounding::same(3.0), Stroke::new(1.0_f32, Color32::WHITE));
+                        ui.add_space(34.0);
+                    });
+
+                    let mut r = app.config.rgb.red;
+                    let mut g = app.config.rgb.green;
+                    let mut b = app.config.rgb.blue;
+                    let mut changed = false;
+
+                    if ui.add(egui::Slider::new(&mut r, 0..=255).text("R").text_color(Color32::from_rgb(255, 80, 80))).changed() {
+                        app.config.rgb.red = r;
+                        changed = true;
+                    }
+                    if ui.add(egui::Slider::new(&mut g, 0..=255).text("G").text_color(Color32::from_rgb(80, 255, 120))).changed() {
+                        app.config.rgb.green = g;
+                        changed = true;
+                    }
+                    if ui.add(egui::Slider::new(&mut b, 0..=255).text("B").text_color(Color32::from_rgb(80, 180, 255))).changed() {
+                        app.config.rgb.blue = b;
+                        changed = true;
+                    }
+                    if changed {
+                        if app.config.rgb.mode == RgbMode::Off {
+                            app.config.rgb.mode = RgbMode::Static;
+                        }
+                        app.apply_rgb_config();
+                    }
+                });
+            });
+        });
+
+    ui.add_space(12.0);
+
+    // ----------------------------------------------------
+    // SECTION 3: 3-TIER VIBRATION ENGINE (Low, Medium, High)
+    // ----------------------------------------------------
+    egui::Frame::none()
+        .fill(Color32::from_rgb(14, 18, 27))
+        .stroke(Stroke::new(1.0_f32, Color32::from_rgb(26, 35, 52)))
+        .rounding(egui::Rounding::same(10.0))
+        .inner_margin(14.0)
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("3-Tier Vibration Force Engine")
+                        .strong()
+                        .size(15.0)
+                        .color(Color32::from_rgb(0, 220, 255)),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let vib_color = match app.config.vibration_mode {
+                        VibrationMode::Off => Color32::GRAY,
+                        VibrationMode::Low => Color32::from_rgb(0, 245, 140),
+                        VibrationMode::Medium => Color32::from_rgb(0, 210, 255),
+                        VibrationMode::High => Color32::from_rgb(220, 100, 255),
+                    };
+                    ui.label(
+                        egui::RichText::new(format!("Current: {}", app.config.vibration_mode.label()))
+                            .strong()
+                            .size(12.0)
+                            .color(vib_color),
+                    );
+                });
+            });
+            ui.add_space(3.0);
+            ui.label(
+                egui::RichText::new("Select vibration power profile or test physical haptic pulses on the controller.")
+                    .size(13.0)
+                    .color(Color32::from_rgb(175, 190, 215)),
+            );
+            ui.add_space(12.0);
+
+            // 3-Tier Mode Cards (Low, Medium, High + Off)
+            ui.columns(4, |cols| {
+                // Tier 1: LOW
+                cols[0].vertical_centered(|ui| {
+                    let is_active = app.config.vibration_mode == VibrationMode::Low;
+                    let fill = if is_active { Color32::from_rgb(16, 36, 26) } else { Color32::from_rgb(16, 22, 32) };
+                    let stroke = if is_active { Color32::from_rgb(0, 245, 140) } else { Color32::from_rgb(32, 44, 60) };
+
+                    egui::Frame::none()
+                        .fill(fill)
+                        .stroke(Stroke::new(if is_active { 1.6_f32 } else { 1.0_f32 }, stroke))
+                        .rounding(egui::Rounding::same(8.0))
+                        .inner_margin(10.0)
+                        .show(ui, |ui| {
+                            ui.label(egui::RichText::new("LOW").strong().size(14.0).color(Color32::from_rgb(0, 245, 140)));
+                            ui.label(egui::RichText::new("30% Strength").size(11.0).color(Color32::WHITE));
+                            ui.label(egui::RichText::new("Gentle & Battery Friendly").small().color(Color32::from_rgb(140, 160, 185)));
+                            ui.add_space(6.0);
+                            let btn_text = if is_active { "[Active]" } else { "Select Low" };
+                            if ui.button(egui::RichText::new(btn_text).strong().size(12.0)).clicked() {
+                                app.apply_vibration_mode(VibrationMode::Low);
+                            }
+                        });
+                });
+
+                // Tier 2: MEDIUM
+                cols[1].vertical_centered(|ui| {
+                    let is_active = app.config.vibration_mode == VibrationMode::Medium;
+                    let fill = if is_active { Color32::from_rgb(16, 32, 48) } else { Color32::from_rgb(16, 22, 32) };
+                    let stroke = if is_active { Color32::from_rgb(0, 220, 255) } else { Color32::from_rgb(32, 44, 60) };
+
+                    egui::Frame::none()
+                        .fill(fill)
+                        .stroke(Stroke::new(if is_active { 1.6_f32 } else { 1.0_f32 }, stroke))
+                        .rounding(egui::Rounding::same(8.0))
+                        .inner_margin(10.0)
+                        .show(ui, |ui| {
+                            ui.label(egui::RichText::new("MEDIUM").strong().size(14.0).color(Color32::from_rgb(0, 220, 255)));
+                            ui.label(egui::RichText::new("65% Strength").size(11.0).color(Color32::WHITE));
+                            ui.label(egui::RichText::new("Balanced Esports Rumble").small().color(Color32::from_rgb(140, 160, 185)));
+                            ui.add_space(6.0);
+                            let btn_text = if is_active { "[Active]" } else { "Select Medium" };
+                            if ui.button(egui::RichText::new(btn_text).strong().size(12.0)).clicked() {
+                                app.apply_vibration_mode(VibrationMode::Medium);
+                            }
+                        });
+                });
+
+                // Tier 3: HIGH
+                cols[2].vertical_centered(|ui| {
+                    let is_active = app.config.vibration_mode == VibrationMode::High;
+                    let fill = if is_active { Color32::from_rgb(32, 18, 44) } else { Color32::from_rgb(16, 22, 32) };
+                    let stroke = if is_active { Color32::from_rgb(210, 110, 255) } else { Color32::from_rgb(32, 44, 60) };
+
+                    egui::Frame::none()
+                        .fill(fill)
+                        .stroke(Stroke::new(if is_active { 1.6_f32 } else { 1.0_f32 }, stroke))
+                        .rounding(egui::Rounding::same(8.0))
+                        .inner_margin(10.0)
+                        .show(ui, |ui| {
+                            ui.label(egui::RichText::new("HIGH").strong().size(14.0).color(Color32::from_rgb(210, 110, 255)));
+                            ui.label(egui::RichText::new("100% Strength").size(11.0).color(Color32::WHITE));
+                            ui.label(egui::RichText::new("Maximum Dual-Motor Power").small().color(Color32::from_rgb(140, 160, 185)));
+                            ui.add_space(6.0);
+                            let btn_text = if is_active { "[Active]" } else { "Select High" };
+                            if ui.button(egui::RichText::new(btn_text).strong().size(12.0)).clicked() {
+                                app.apply_vibration_mode(VibrationMode::High);
+                            }
+                        });
+                });
+
+                // Tier 4: OFF
+                cols[3].vertical_centered(|ui| {
+                    let is_active = app.config.vibration_mode == VibrationMode::Off;
+                    let fill = if is_active { Color32::from_rgb(32, 16, 18) } else { Color32::from_rgb(16, 22, 32) };
+                    let stroke = if is_active { Color32::from_rgb(240, 70, 70) } else { Color32::from_rgb(32, 44, 60) };
+
+                    egui::Frame::none()
+                        .fill(fill)
+                        .stroke(Stroke::new(if is_active { 1.6_f32 } else { 1.0_f32 }, stroke))
+                        .rounding(egui::Rounding::same(8.0))
+                        .inner_margin(10.0)
+                        .show(ui, |ui| {
+                            ui.label(egui::RichText::new("OFF").strong().size(14.0).color(Color32::from_rgb(240, 70, 70)));
+                            ui.label(egui::RichText::new("0% Strength").size(11.0).color(Color32::WHITE));
+                            ui.label(egui::RichText::new("Stealth / Zero Feedback").small().color(Color32::from_rgb(140, 160, 185)));
+                            ui.add_space(6.0);
+                            let btn_text = if is_active { "[Active]" } else { "Turn Off" };
+                            if ui.button(egui::RichText::new(btn_text).strong().size(12.0)).clicked() {
+                                app.apply_vibration_mode(VibrationMode::Off);
+                            }
+                        });
+                });
+            });
+
+            ui.add_space(14.0);
+
+            // Test Vibration Pulse Buttons
+            ui.horizontal(|ui| {
+                let test_btn = egui::Button::new(
+                    egui::RichText::new("⚡ Test Haptic Pulse (450ms)")
+                        .strong()
+                        .size(13.0)
+                        .color(Color32::BLACK),
+                )
+                .fill(Color32::from_rgb(0, 220, 255))
+                .min_size(Vec2::new(200.0, 32.0));
+
+                if ui.add(test_btn).clicked() {
+                    app.trigger_vibration_pulse(std::time::Duration::from_millis(450));
+                    app.set_status(format!("Pulsing motors at {} force...", app.config.vibration_mode.label()));
+                }
+
+                if ui.button(egui::RichText::new("Stop Motors").size(12.5).color(Color32::from_rgb(255, 90, 90))).clicked() {
+                    app.stop_vibration();
+                    app.set_status("Motors immediately stopped.");
+                }
+            });
+        });
+
+    ui.add_space(12.0);
+
+    // ----------------------------------------------------
+    // SECTION 4: EASYSMX HARDWARE SHORTCUT QUICK REFERENCE
+    // ----------------------------------------------------
+    egui::Frame::none()
+        .fill(Color32::from_rgb(14, 18, 27))
+        .stroke(Stroke::new(1.0_f32, Color32::from_rgb(26, 35, 52)))
+        .rounding(egui::Rounding::same(10.0))
+        .inner_margin(14.0)
+        .show(ui, |ui| {
+            ui.label(
+                egui::RichText::new("EasySMX X05 Pro Hardware Shortcuts")
+                    .strong()
+                    .size(14.0)
+                    .color(Color32::from_rgb(200, 215, 235)),
+            );
+            ui.add_space(6.0);
+
+            ui.columns(2, |cols| {
+                cols[0].vertical(|ui| {
+                    ui.label(egui::RichText::new("• FN + D-Pad Left: Cycle RGB Light Modes").size(12.5).color(Color32::from_rgb(175, 190, 215)));
+                    ui.label(egui::RichText::new("• FN + D-Pad Right: Cycle 7 Solid RGB Colors").size(12.5).color(Color32::from_rgb(175, 190, 215)));
+                });
+                cols[1].vertical(|ui| {
+                    ui.label(egui::RichText::new("• FN + D-Pad Up / Down: Adjust LED Brightness").size(12.5).color(Color32::from_rgb(175, 190, 215)));
+                    ui.label(egui::RichText::new("• FN + Left Stick Click (L3): Cycle Vibration (0%, 30%, 70%, 100%)").size(12.5).color(Color32::from_rgb(175, 190, 215)));
+                });
+            });
+        });
+}
+
+fn draw_controller_lighting_canvas(ui: &mut egui::Ui, live_rgb: Color32, is_connected: bool, _current_time: f64) {
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 130.0), egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+    let center = rect.center();
+
+    // Dark canvas frame
+    painter.rect_filled(rect, egui::Rounding::same(8.0), Color32::from_rgb(10, 13, 20));
+    painter.rect_stroke(rect, egui::Rounding::same(8.0), Stroke::new(1.0_f32, Color32::from_rgb(22, 30, 44)));
+
+    // Controller main chassis body
+    let body_rect = egui::Rect::from_center_size(center, Vec2::new(260.0, 95.0));
+    painter.rect_filled(body_rect, egui::Rounding::same(24.0), Color32::from_rgb(18, 23, 34));
+    painter.rect_stroke(body_rect, egui::Rounding::same(24.0), Stroke::new(1.4_f32, Color32::from_rgb(34, 44, 62)));
+
+    // Dynamic Side RGB Light Strips on Grips
+    let strip_glow = Color32::from_rgba_unmultiplied(live_rgb.r(), live_rgb.g(), live_rgb.b(), if is_connected { 210 } else { 75 });
+    painter.line_segment(
+        [Pos2::new(center.x - 120.0, center.y - 15.0), Pos2::new(center.x - 122.0, center.y + 35.0)],
+        Stroke::new(3.5_f32, strip_glow),
+    );
+    painter.line_segment(
+        [Pos2::new(center.x + 120.0, center.y - 15.0), Pos2::new(center.x + 122.0, center.y + 35.0)],
+        Stroke::new(3.5_f32, strip_glow),
+    );
+
+    // Left Stick Halo Ring
+    let ls_pos = Pos2::new(center.x - 65.0, center.y - 10.0);
+    painter.circle_filled(ls_pos, 19.0, Color32::from_rgb(13, 16, 24));
+    painter.circle_stroke(ls_pos, 20.0, Stroke::new(2.4_f32, strip_glow));
+    painter.circle_filled(ls_pos, 11.0, Color32::from_rgb(28, 36, 50));
+
+    // Right Stick Halo Ring
+    let rs_pos = Pos2::new(center.x + 40.0, center.y + 12.0);
+    painter.circle_filled(rs_pos, 19.0, Color32::from_rgb(13, 16, 24));
+    painter.circle_stroke(rs_pos, 20.0, Stroke::new(2.4_f32, strip_glow));
+    painter.circle_filled(rs_pos, 11.0, Color32::from_rgb(28, 36, 50));
+
+    // D-Pad (Left Bottom)
+    let dpad_center = Pos2::new(center.x - 40.0, center.y + 14.0);
+    painter.line_segment([Pos2::new(dpad_center.x - 9.0, dpad_center.y), Pos2::new(dpad_center.x + 9.0, dpad_center.y)], Stroke::new(3.2_f32, Color32::from_rgb(60, 75, 100)));
+    painter.line_segment([Pos2::new(dpad_center.x, dpad_center.y - 9.0), Pos2::new(dpad_center.x, dpad_center.y + 9.0)], Stroke::new(3.2_f32, Color32::from_rgb(60, 75, 100)));
+
+    // ABXY Cluster (Right Top)
+    let abxy_center = Pos2::new(center.x + 65.0, center.y - 10.0);
+    painter.circle_filled(Pos2::new(abxy_center.x, abxy_center.y - 9.0), 3.5, Color32::from_rgb(255, 200, 30)); // Y
+    painter.circle_filled(Pos2::new(abxy_center.x + 9.0, abxy_center.y), 3.5, Color32::from_rgb(240, 70, 70));   // B
+    painter.circle_filled(Pos2::new(abxy_center.x, abxy_center.y + 9.0), 3.5, Color32::from_rgb(0, 220, 110));  // A
+    painter.circle_filled(Pos2::new(abxy_center.x - 9.0, abxy_center.y), 3.5, Color32::from_rgb(0, 190, 255));  // X
+
+    // Center EasySMX Glowing Logo Badge
+    let logo_center = Pos2::new(center.x, center.y - 15.0);
+    painter.circle_filled(logo_center, 8.0, Color32::from_rgb(13, 17, 26));
+    painter.circle_stroke(logo_center, 8.0, Stroke::new(1.6_f32, strip_glow));
+    painter.text(logo_center, egui::Align2::CENTER_CENTER, "X", egui::FontId::proportional(9.0), strip_glow);
+}
+
+// ----------------------------------------------------
 // GAME PROFILES TAB
 // ----------------------------------------------------
 fn render_profiles(app: &mut SuiteApp, ui: &mut egui::Ui) {
@@ -1393,9 +1895,65 @@ fn render_hardware_guide(ui: &mut egui::Ui) {
 }
 
 // ----------------------------------------------------
+// RGB COLOR COMPUTATION & HSV UTILITY
+// ----------------------------------------------------
+pub fn compute_rgb_color(rgb: &crate::config::RgbConfig, current_time: f64, lt: f32, rt: f32, stick_mag: f32) -> Color32 {
+    let b = rgb.brightness.clamp(0.0, 1.0);
+    match rgb.mode {
+        crate::config::RgbMode::Off => Color32::from_rgb(25, 34, 48),
+        crate::config::RgbMode::Static => {
+            Color32::from_rgb(
+                (rgb.red as f32 * b) as u8,
+                (rgb.green as f32 * b) as u8,
+                (rgb.blue as f32 * b) as u8,
+            )
+        }
+        crate::config::RgbMode::Breathing => {
+            let wave = ((current_time * rgb.speed as f64 * 2.8).sin() * 0.45 + 0.55) as f32 * b;
+            Color32::from_rgb(
+                (rgb.red as f32 * wave) as u8,
+                (rgb.green as f32 * wave) as u8,
+                (rgb.blue as f32 * wave) as u8,
+            )
+        }
+        crate::config::RgbMode::Rainbow => {
+            let t = (current_time * rgb.speed as f64 * 0.35) % 1.0;
+            let (r, g, b_val) = hsv_to_rgb(t as f32, 1.0, b);
+            Color32::from_rgb(r, g, b_val)
+        }
+        crate::config::RgbMode::Reactive => {
+            let activity = (lt.max(rt).max(stick_mag)).clamp(0.0, 1.0);
+            let boost = (0.25 + activity * 0.75) * b;
+            Color32::from_rgb(
+                (rgb.red as f32 * boost) as u8,
+                (rgb.green as f32 * boost) as u8,
+                (rgb.blue as f32 * boost) as u8,
+            )
+        }
+    }
+}
+
+pub fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
+    let i = (h * 6.0).floor() as i32;
+    let f = h * 6.0 - i as f32;
+    let p = v * (1.0 - s);
+    let q = v * (1.0 - f * s);
+    let t = v * (1.0 - (1.0 - f) * s);
+    let (r, g, b) = match i.rem_euclid(6) {
+        0 => (v, t, p),
+        1 => (q, v, p),
+        2 => (p, v, t),
+        3 => (p, q, v),
+        4 => (t, p, v),
+        _ => (v, p, q),
+    };
+    ((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
+}
+
+// ----------------------------------------------------
 // HIGH-TECH RADAR WITH LIVE ROTATING SCANNER ANIMATION
 // ----------------------------------------------------
-fn draw_stick_radar(ui: &mut egui::Ui, x: f32, y: f32, deadzone: f32, current_time: f64) {
+fn draw_stick_radar(ui: &mut egui::Ui, x: f32, y: f32, deadzone: f32, current_time: f64, ring_color: Color32) {
     let size = Vec2::splat(84.0);
     let (rect, _response) = ui.allocate_exact_size(size, egui::Sense::hover());
     let painter = ui.painter_at(rect);
@@ -1407,9 +1965,9 @@ fn draw_stick_radar(ui: &mut egui::Ui, x: f32, y: f32, deadzone: f32, current_ti
     painter.rect_filled(rect, egui::Rounding::same(8.0), Color32::from_rgb(11, 15, 22));
     painter.rect_stroke(rect, egui::Rounding::same(8.0), Stroke::new(1.0_f32, Color32::from_rgb(28, 38, 54)));
 
-    // Concentric Radar Rings
-    painter.circle_stroke(center, radius, Stroke::new(1.5_f32, Color32::from_rgb(0, 190, 245)));
-    painter.circle_stroke(center, radius * 0.75, Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(35, 50, 75, 140)));
+    // Concentric Radar Rings (Accentuated with user's selected RGB theme)
+    painter.circle_stroke(center, radius, Stroke::new(1.6_f32, ring_color));
+    painter.circle_stroke(center, radius * 0.75, Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(ring_color.r(), ring_color.g(), ring_color.b(), 70)));
     painter.circle_stroke(center, radius * 0.50, Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(35, 50, 75, 140)));
 
     // Deadzone Circle (translucent reddish tint)
@@ -1426,12 +1984,12 @@ fn draw_stick_radar(ui: &mut egui::Ui, x: f32, y: f32, deadzone: f32, current_ti
         center.x + sweep_angle.cos() * radius,
         center.y + sweep_angle.sin() * radius,
     );
-    painter.line_segment([center, sweep_end], Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(0, 220, 255, 55)));
+    painter.line_segment([center, sweep_end], Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(ring_color.r(), ring_color.g(), ring_color.b(), 65)));
 
-    // Stick Head Pointer with Glowing Cyan Ring & White Core
+    // Stick Head Pointer with Glowing RGB Ring & White Core
     let dot_pos = Pos2::new(center.x + x * radius, center.y - y * radius);
-    painter.line_segment([center, dot_pos], Stroke::new(1.8_f32, Color32::from_rgba_unmultiplied(0, 225, 255, 170)));
-    painter.circle_filled(dot_pos, 5.0, Color32::from_rgb(0, 220, 255));
+    painter.line_segment([center, dot_pos], Stroke::new(1.8_f32, Color32::from_rgba_unmultiplied(ring_color.r(), ring_color.g(), ring_color.b(), 170)));
+    painter.circle_filled(dot_pos, 5.0, ring_color);
     painter.circle_filled(dot_pos, 2.0, Color32::WHITE);
 }
 

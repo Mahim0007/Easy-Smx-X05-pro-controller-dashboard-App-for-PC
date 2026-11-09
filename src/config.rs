@@ -9,6 +9,86 @@ pub enum CurveType {
     Aggressive,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VibrationMode {
+    Off,
+    Low,
+    Medium,
+    High,
+}
+
+impl VibrationMode {
+    pub fn speeds(&self) -> (u16, u16) {
+        match self {
+            VibrationMode::Off => (0, 0),
+            VibrationMode::Low => (20000, 18000),      // ~30% strength (gentle)
+            VibrationMode::Medium => (42000, 38000),   // ~65% strength (balanced esports)
+            VibrationMode::High => (65535, 65535),     // 100% full rumble
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            VibrationMode::Off => "Off (0%)",
+            VibrationMode::Low => "Low (30%)",
+            VibrationMode::Medium => "Medium (65%)",
+            VibrationMode::High => "High (100%)",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RgbMode {
+    Rainbow,
+    Breathing,
+    Static,
+    Reactive,
+    Off,
+}
+
+impl RgbMode {
+    pub fn label(&self) -> &'static str {
+        match self {
+            RgbMode::Rainbow => "Rainbow Wave",
+            RgbMode::Breathing => "Breathing Pulse",
+            RgbMode::Static => "Static Color",
+            RgbMode::Reactive => "Input Reactive",
+            RgbMode::Off => "Lights Off",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RgbConfig {
+    pub mode: RgbMode,
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+    pub brightness: f32, // 0.0 to 1.0
+    pub speed: f32,      // 0.5 to 2.0
+}
+
+impl Default for RgbConfig {
+    fn default() -> Self {
+        Self {
+            mode: RgbMode::Rainbow,
+            red: 0,
+            green: 210,
+            blue: 255, // Cyan default
+            brightness: 0.85,
+            speed: 1.0,
+        }
+    }
+}
+
+fn default_vibration_mode() -> VibrationMode {
+    VibrationMode::Medium
+}
+
+fn default_rgb_config() -> RgbConfig {
+    RgbConfig::default()
+}
+
 fn default_github_repo() -> String {
     "mahim/x05-controller-suite".to_string()
 }
@@ -42,6 +122,10 @@ pub struct AppConfig {
     pub auto_check_updates: bool,
     #[serde(default = "default_polling_rate")]
     pub polling_rate_hz: u32,
+    #[serde(default = "default_vibration_mode")]
+    pub vibration_mode: VibrationMode,
+    #[serde(default = "default_rgb_config")]
+    pub rgb: RgbConfig,
 }
 
 impl Default for AppConfig {
@@ -63,6 +147,8 @@ impl Default for AppConfig {
             github_repo: default_github_repo(),
             auto_check_updates: true,
             polling_rate_hz: 1000,
+            vibration_mode: VibrationMode::Medium,
+            rgb: RgbConfig::default(),
         }
     }
 }

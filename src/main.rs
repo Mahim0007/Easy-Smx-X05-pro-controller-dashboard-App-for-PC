@@ -154,12 +154,14 @@ pub struct SuiteApp {
     pub last_tray_update: Instant,
     pub last_minimized_state: bool,
     pub window_hidden: bool,
+    pub vibration_until: Option<Instant>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Tab {
     Dashboard,
     Performance,
+    RgbHaptics,
     Profiles,
     DesktopMode,
     EasySMXGuide,
@@ -321,6 +323,7 @@ impl SuiteApp {
             last_tray_update: Instant::now(),
             last_minimized_state: false,
             window_hidden: false,
+            vibration_until: None,
         }
     }
 
@@ -347,6 +350,37 @@ impl SuiteApp {
         if let Ok(mut state) = self.shared_controller.lock() {
             state.set_vibration(left, right);
         }
+    }
+
+    pub fn trigger_vibration_pulse(&mut self, duration: Duration) {
+        let (left, right) = self.config.vibration_mode.speeds();
+        if left > 0 || right > 0 {
+            self.test_vibration(left, right);
+            self.vibration_until = Some(Instant::now() + duration);
+        }
+    }
+
+    pub fn apply_vibration_mode(&mut self, mode: config::VibrationMode) {
+        self.config.vibration_mode = mode;
+        let _ = self.config.save();
+        if let Ok(mut cfg) = self.shared_config.lock() {
+            cfg.vibration_mode = mode;
+        }
+        if mode != config::VibrationMode::Off {
+            self.trigger_vibration_pulse(Duration::from_millis(450));
+            self.set_status(format!("Vibration power set to {}", mode.label()));
+        } else {
+            self.stop_vibration();
+            self.set_status("Vibration motors turned OFF.");
+        }
+    }
+
+    pub fn apply_rgb_config(&mut self) {
+        let _ = self.config.save();
+        if let Ok(mut cfg) = self.shared_config.lock() {
+            cfg.rgb = self.config.rgb.clone();
+        }
+        self.set_status(format!("RGB profile '{}' synced to controller!", self.config.rgb.mode.label()));
     }
 
     pub fn stop_vibration(&mut self) {
@@ -404,6 +438,14 @@ impl eframe::App for SuiteApp {
         // Read latest polled controller state from background thread
         if let Ok(state) = self.shared_controller.lock() {
             self.controller = state.clone();
+        }
+
+        // Automatic non-blocking vibration pulse cutoff
+        if let Some(until) = self.vibration_until {
+            if Instant::now() >= until {
+                self.stop_vibration();
+                self.vibration_until = None;
+            }
         }
 
         // Read actual measured polling frequency
