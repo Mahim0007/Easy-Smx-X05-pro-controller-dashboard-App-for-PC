@@ -72,6 +72,12 @@ flowchart TD
 
 ## 🎯 Key Features
 
+### 🔄 Zero-Click Background Auto-Update at Launch
+- **Automatic GitHub Sync:** Every time the suite is launched, a non-blocking background thread queries GitHub for new releases or updated binaries.
+- **Rate-Limit-Free Detection:** Utilizes direct HTTP HEAD location redirect parsing, completely bypassing GitHub's unauthenticated 60 req/hr API rate limits.
+- **Seamless Atomic Upgrade:** When an update is detected, the app automatically downloads the new binary, displays a Windows system tray notification, and cleanly relaunches with the latest build.
+- **Toggleable in Settings:** Can be easily enabled or disabled anytime via the `Settings & Sys` tab.
+
 ### 📳 Dual-Motor Vibration & Haptics Studio
 - **Dedicated 3-Tier Force Profiles:** **Low (30%)** for gentle tactile battery saving, **Medium (65%)** for balanced esports recoil, and **High (100%)** for maximum dual-motor rumble immersion (plus Stealth Off).
 - **Dual Asymmetric Motor Tuning:** Separately models the Left Motor (heavy low-frequency rumble for explosions/collisions) and Right Motor (sharp high-frequency spin for subtle surface textures).
