@@ -72,15 +72,11 @@ flowchart TD
 
 ## 🎯 Key Features
 
-### 🌈 Full RGB Illumination Studio
-- **Dynamic Lighting Modes:** Rainbow Spectrum Wave, Breathing Pulse, Monochromatic Static, Input Reactive (lights up upon trigger pulls/stick flick), and Stealth Lights Off.
-- **Color Presets & Fine Tuning:** One-click presets (Neon Cyan, Cyber Red, Royal Purple, Emerald Green, Electric Gold, Sunset Orange, Polar White) plus fine 0–255 RGB sliders with live hex swatch.
-- **Interactive Visualizer Canvas:** Live glowing controller graphic on the dashboard mimics the hardware halo rings and grip strips in real-time.
-
-### 📳 3-Tier Vibration Force Engine
-- **Dedicated Force Profiles:** **Low (30%)** for gentle haptic battery saving, **Medium (65%)** for balanced esports recoil, and **High (100%)** for maximum dual-motor rumble immersion (plus Stealth Off).
+### 📳 Dual-Motor Vibration & Haptics Studio
+- **Dedicated 3-Tier Force Profiles:** **Low (30%)** for gentle tactile battery saving, **Medium (65%)** for balanced esports recoil, and **High (100%)** for maximum dual-motor rumble immersion (plus Stealth Off).
+- **Dual Asymmetric Motor Tuning:** Separately models the Left Motor (heavy low-frequency rumble for explosions/collisions) and Right Motor (sharp high-frequency spin for subtle surface textures).
 - **Instant Haptic Pulse Test:** One-click `⚡ Test Haptic Pulse (450ms)` button sends an immediate non-blocking test rumble to the controller motors.
-- **Non-blocking Cutoff:** Managed via high-precision hardware timestamps to prevent motor lockups.
+- **Hardware Timestamp Cutoff:** Non-blocking auto-shutoff prevents vibration lockups during rapid triggers.
 
 ### ⚽ Pro Game Profiles & Esports Tunings
 - **[ FOOTBALL ESPORTS ] EA Sports FC / FIFA (FUT Champs & Seasons):**
