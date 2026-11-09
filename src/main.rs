@@ -152,6 +152,7 @@ pub struct SuiteApp {
     pub last_full_battery_alert: bool,
     pub last_wired_state: bool,
     pub last_tray_update: Instant,
+    pub last_minimized_state: bool,
     pub window_hidden: bool,
 }
 
@@ -198,6 +199,11 @@ impl SuiteApp {
                     timeBeginPeriod(1);
                 }
 
+                #[cfg(windows)]
+                let cur_th = unsafe { windows::Win32::System::Threading::GetCurrentThread() };
+                #[cfg(windows)]
+                let mut last_boosted = false;
+
                 let mut frame_count: u32 = 0;
                 let mut last_hz_time = Instant::now();
 
@@ -211,6 +217,21 @@ impl SuiteApp {
                         .lock()
                         .map(|c| c.desktop_mouse_mode)
                         .unwrap_or(false);
+
+                    // Dynamic Thread Priority Tuning:
+                    // Active esports mode gets HIGHEST priority; background drops to LOWEST for zero CPU contention
+                    #[cfg(windows)]
+                    {
+                        let should_boost = is_active || is_mouse_enabled;
+                        if should_boost != last_boosted {
+                            last_boosted = should_boost;
+                            unsafe {
+                                use windows::Win32::System::Threading::{SetThreadPriority, THREAD_PRIORITY_HIGHEST, THREAD_PRIORITY_LOWEST};
+                                let prio = if should_boost { THREAD_PRIORITY_HIGHEST } else { THREAD_PRIORITY_LOWEST };
+                                let _ = SetThreadPriority(cur_th, prio);
+                            }
+                        }
+                    }
 
                     let (is_connected, is_awake) = {
                         if let Ok(mut state) = poller_controller.lock() {
@@ -298,6 +319,7 @@ impl SuiteApp {
             last_full_battery_alert: false,
             last_wired_state: false,
             last_tray_update: Instant::now(),
+            last_minimized_state: false,
             window_hidden: false,
         }
     }
@@ -366,6 +388,18 @@ impl eframe::App for SuiteApp {
         let is_hidden_or_minimized = self.window_hidden || is_minimized;
         let is_active = !is_hidden_or_minimized && is_focused;
         self.is_app_active.store(is_active, Ordering::Relaxed);
+
+        // Memory Working Set Trimming: Reclaim GPU driver scratch buffers when minimized
+        if is_hidden_or_minimized && !self.last_minimized_state {
+            self.last_minimized_state = true;
+            #[cfg(windows)]
+            unsafe {
+                use windows::Win32::System::Threading::{GetCurrentProcess, SetProcessWorkingSetSize};
+                let _ = SetProcessWorkingSetSize(GetCurrentProcess(), usize::MAX, usize::MAX);
+            }
+        } else if !is_hidden_or_minimized && self.last_minimized_state {
+            self.last_minimized_state = false;
+        }
 
         // Read latest polled controller state from background thread
         if let Ok(state) = self.shared_controller.lock() {
