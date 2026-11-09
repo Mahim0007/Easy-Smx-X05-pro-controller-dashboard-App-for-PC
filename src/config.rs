@@ -90,7 +90,7 @@ fn default_rgb_config() -> RgbConfig {
 }
 
 fn default_github_repo() -> String {
-    "mahim/x05-controller-suite".to_string()
+    "Mahim0007/Easy-Smx-X05-pro-controller-dashboard-App-for-PC".to_string()
 }
 
 fn default_true() -> bool {
@@ -120,6 +120,8 @@ pub struct AppConfig {
     pub github_repo: String,
     #[serde(default = "default_true")]
     pub auto_check_updates: bool,
+    #[serde(default = "default_true")]
+    pub auto_install_updates: bool,
     #[serde(default = "default_polling_rate")]
     pub polling_rate_hz: u32,
     #[serde(default = "default_vibration_mode")]
@@ -146,6 +148,7 @@ impl Default for AppConfig {
             active_profile: "Balanced Default".to_string(),
             github_repo: default_github_repo(),
             auto_check_updates: true,
+            auto_install_updates: true,
             polling_rate_hz: 1000,
             vibration_mode: VibrationMode::Medium,
             rgb: RgbConfig::default(),
@@ -170,7 +173,11 @@ impl AppConfig {
         let path = Self::config_path();
         if path.exists() {
             if let Ok(content) = fs::read_to_string(&path) {
-                if let Ok(cfg) = serde_json::from_str(&content) {
+                if let Ok(mut cfg) = serde_json::from_str::<AppConfig>(&content) {
+                    if cfg.github_repo == "mahim/x05-controller-suite" || cfg.github_repo.is_empty() {
+                        cfg.github_repo = default_github_repo();
+                        let _ = cfg.save();
+                    }
                     return cfg;
                 }
             }

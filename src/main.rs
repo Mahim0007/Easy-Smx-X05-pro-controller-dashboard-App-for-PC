@@ -176,7 +176,7 @@ impl SuiteApp {
     pub fn new(config: AppConfig, startup_enabled: bool) -> Self {
         let updater = AutoUpdater::new();
         if config.auto_check_updates {
-            updater.check_for_updates(config.github_repo.clone(), false);
+            updater.check_for_updates(config.github_repo.clone(), config.auto_install_updates, false);
         }
         let repo_input = config.github_repo.clone();
 

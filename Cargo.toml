@@ -1,6 +1,6 @@
 [package]
 name = "x05-controller-suite"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "Ultra-lightweight Gamepad Optimizer & Companion Suite for EasySMX X05 Pro"
 authors = ["Mahim"]

@@ -1643,10 +1643,15 @@ fn render_settings(app: &mut SuiteApp, ui: &mut egui::Ui) {
                 }
             });
 
+            ui.add_space(8.0);
+            if ui.checkbox(&mut app.config.auto_install_updates, egui::RichText::new("Zero-Click Auto Update: Download & restart on startup when new update is uploaded").size(13.0)).changed() {
+                let _ = app.config.save();
+            }
+
             ui.add_space(10.0);
             if ui.button(egui::RichText::new("Check for Releases Now").strong().size(13.5)).clicked() {
-                app.updater.check_for_updates(app.config.github_repo.clone(), true);
-                app.set_status("Querying GitHub API for latest release...");
+                app.updater.check_for_updates(app.config.github_repo.clone(), false, true);
+                app.set_status("Querying GitHub for latest release...");
             }
         });
 }
