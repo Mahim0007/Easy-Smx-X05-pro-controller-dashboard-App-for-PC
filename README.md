@@ -72,6 +72,11 @@ flowchart TD
 
 ## 🎯 Key Features
 
+### 🌐 Smart Online / Offline Standby System
+- **Real-Time Link Detection:** Automatically detects hardware connection and wake events via XInput/HID polling.
+- **Instant Online Activation:** The moment your controller is connected or wakes up, the suite switches to **● ONLINE**, activating the 1000Hz polling engine, live Hall-Effect radar, and all controls with a native tray notification chime.
+- **Zero-Power Offline Standby:** When disconnected, the suite transitions to **○ OFFLINE (Standby)**, immediately cutting vibration motors, parking polling at 0.00% CPU, and showing an informative hardware connection hub.
+
 ### 🔄 Zero-Click Background Auto-Update at Launch
 - **Automatic GitHub Sync:** Every time the suite is launched, a non-blocking background thread queries GitHub for new releases or updated binaries.
 - **Rate-Limit-Free Detection:** Utilizes direct HTTP HEAD location redirect parsing, completely bypassing GitHub's unauthenticated 60 req/hr API rate limits.
