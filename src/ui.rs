@@ -111,18 +111,29 @@ pub fn render_ui(app: &mut SuiteApp, ctx: &egui::Context) {
                     }
 
                     // Polling Rate Badge Pill
+                    let is_online = app.controller.connected;
                     let hz_pill = egui::Frame::none()
-                        .fill(Color32::from_rgb(14, 26, 40))
-                        .stroke(Stroke::new(1.0_f32, Color32::from_rgb(0, 170, 240)))
+                        .fill(if is_online { Color32::from_rgb(14, 26, 40) } else { Color32::from_rgb(26, 16, 20) })
+                        .stroke(Stroke::new(1.0_f32, if is_online { Color32::from_rgb(0, 170, 240) } else { Color32::from_rgb(70, 40, 50) }))
                         .rounding(egui::Rounding::same(12.0))
                         .inner_margin(egui::Margin::symmetric(8.0, 3.0));
                     hz_pill.show(ui, |ui| {
+                        let text = if is_online {
+                            format!("{:.0} Hz  (1.0 ms)", app.polling_rate_hz)
+                        } else {
+                            "OFFLINE  (0 Hz)".to_string()
+                        };
+                        let color = if is_online {
+                            Color32::from_rgb(0, 225, 255)
+                        } else {
+                            Color32::from_rgb(160, 105, 120)
+                        };
                         ui.label(
-                            egui::RichText::new(format!("{:.0} Hz  (1.0 ms)", app.polling_rate_hz))
+                            egui::RichText::new(text)
                                 .monospace()
                                 .strong()
                                 .size(11.0)
-                                .color(Color32::from_rgb(0, 225, 255)),
+                                .color(color),
                         );
                     });
 
@@ -148,12 +159,29 @@ pub fn render_ui(app: &mut SuiteApp, ctx: &egui::Context) {
         )
         .show(ctx, |ui| {
             ui.add_space(4.0);
-            ui.label(
-                egui::RichText::new("PERIPHERAL MENU")
-                    .size(10.0)
-                    .strong()
-                    .color(Color32::from_rgb(85, 100, 125)),
-            );
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("PERIPHERAL MENU")
+                        .size(10.0)
+                        .strong()
+                        .color(Color32::from_rgb(85, 100, 125)),
+                );
+                if app.controller.connected {
+                    ui.label(
+                        egui::RichText::new("● ONLINE")
+                            .size(9.0)
+                            .strong()
+                            .color(Color32::from_rgb(0, 245, 140)),
+                    );
+                } else {
+                    ui.label(
+                        egui::RichText::new("○ OFFLINE")
+                            .size(9.0)
+                            .strong()
+                            .color(Color32::from_rgb(240, 70, 70)),
+                    );
+                }
+            });
             ui.add_space(8.0);
 
             nav_button(ui, &mut app.active_tab, Tab::Dashboard, NavIcon::Dashboard, "Dashboard");
@@ -200,14 +228,23 @@ pub fn render_ui(app: &mut SuiteApp, ctx: &egui::Context) {
             egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
-                    match app.active_tab {
-                        Tab::Dashboard => render_dashboard(app, ui, current_time),
-                        Tab::Performance => render_performance(app, ui),
-                        Tab::Vibration => render_vibration(app, ui),
-                        Tab::Profiles => render_profiles(app, ui),
-                        Tab::DesktopMode => render_desktop_mode(app, ui),
-                        Tab::Settings => render_settings(app, ui),
-                        Tab::EasySMXGuide => render_hardware_guide(ui),
+                    if !app.controller.connected
+                        && matches!(
+                            app.active_tab,
+                            Tab::Dashboard | Tab::Performance | Tab::Vibration | Tab::DesktopMode
+                        )
+                    {
+                        render_offline_hub(app, ui, current_time);
+                    } else {
+                        match app.active_tab {
+                            Tab::Dashboard => render_dashboard(app, ui, current_time),
+                            Tab::Performance => render_performance(app, ui),
+                            Tab::Vibration => render_vibration(app, ui),
+                            Tab::Profiles => render_profiles(app, ui),
+                            Tab::DesktopMode => render_desktop_mode(app, ui),
+                            Tab::Settings => render_settings(app, ui),
+                            Tab::EasySMXGuide => render_hardware_guide(ui),
+                        }
                     }
                 });
         });
@@ -299,28 +336,28 @@ fn render_connection_status_pill(app: &SuiteApp, ui: &mut egui::Ui, current_time
                 Color32::from_rgb(0, 220, 110),
                 Color32::from_rgb(0, 245, 130),
                 Color32::from_rgb(0, 255, 128),
-                "WIRED USB",
+                "ONLINE • WIRED USB",
             ),
             ConnectionMode::Wireless24G => (
                 Color32::from_rgb(10, 28, 44),
                 Color32::from_rgb(0, 190, 245),
                 Color32::from_rgb(0, 220, 255),
                 Color32::from_rgb(0, 220, 255),
-                "2.4GHz WIRELESS",
+                "ONLINE • 2.4GHz WIRELESS",
             ),
             ConnectionMode::Bluetooth => (
                 Color32::from_rgb(28, 16, 44),
                 Color32::from_rgb(170, 110, 245),
                 Color32::from_rgb(195, 150, 255),
                 Color32::from_rgb(210, 160, 255),
-                "BLUETOOTH",
+                "ONLINE • BLUETOOTH",
             ),
             ConnectionMode::Disconnected => (
                 Color32::from_rgb(34, 14, 18),
                 Color32::from_rgb(240, 70, 70),
                 Color32::from_rgb(255, 90, 90),
                 Color32::from_rgb(255, 80, 80),
-                "DISCONNECTED",
+                "OFFLINE",
             ),
         };
 
@@ -361,7 +398,7 @@ fn render_connection_status_pill(app: &SuiteApp, ui: &mut egui::Ui, current_time
                     ui.painter().circle_filled(dot_rect.center(), 3.5, amber_color);
                     ui.add_space(2.0);
                     ui.label(
-                        egui::RichText::new("2.4GHz STANDBY")
+                        egui::RichText::new("OFFLINE • 2.4G STANDBY")
                             .strong()
                             .size(10.5)
                             .color(Color32::from_rgb(255, 185, 30)),
@@ -380,7 +417,7 @@ fn render_connection_status_pill(app: &SuiteApp, ui: &mut egui::Ui, current_time
                     ui.painter().circle_filled(dot_rect.center(), 3.5, Color32::from_rgb(255, 80, 80));
                     ui.add_space(2.0);
                     ui.label(
-                        egui::RichText::new("DISCONNECTED")
+                        egui::RichText::new("OFFLINE • DISCONNECTED")
                             .strong()
                             .size(10.5)
                             .color(Color32::from_rgb(255, 90, 90)),
@@ -527,6 +564,189 @@ fn nav_button(ui: &mut egui::Ui, current_tab: &mut Tab, target_tab: Tab, icon: N
     );
 
     ui.add_space(2.0);
+}
+
+// ----------------------------------------------------
+// OFFLINE STANDBY HUB (Zero-Power Waiting State)
+// ----------------------------------------------------
+fn render_offline_hub(app: &mut SuiteApp, ui: &mut egui::Ui, current_time: f64) {
+    ui.add_space(6.0);
+
+    let is_dongle = app.controller.is_dongle_present;
+    let pulse = (current_time * 2.5).sin() as f32 * 0.25 + 0.75;
+
+    // Hero Offline Standby Card
+    let (bg_color, stroke_color, badge_text, badge_color) = if is_dongle {
+        (
+            Color32::from_rgb(26, 20, 10),
+            Color32::from_rgb(
+                (200.0 * pulse) as u8,
+                (140.0 * pulse) as u8,
+                20,
+            ),
+            "OFFLINE • 2.4GHz DONGLE STANDBY",
+            Color32::from_rgb(255, 190, 40),
+        )
+    } else {
+        (
+            Color32::from_rgb(22, 14, 18),
+            Color32::from_rgb(
+                (180.0 * pulse) as u8,
+                40,
+                50,
+            ),
+            "OFFLINE • CONTROLLER DISCONNECTED",
+            Color32::from_rgb(255, 80, 80),
+        )
+    };
+
+    egui::Frame::none()
+        .fill(bg_color)
+        .stroke(Stroke::new(1.0_f32, stroke_color))
+        .rounding(egui::Rounding::same(12.0))
+        .inner_margin(18.0)
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                // Status Badge
+                let badge_frame = egui::Frame::none()
+                    .fill(Color32::from_rgb(14, 18, 26))
+                    .stroke(Stroke::new(1.0_f32, badge_color))
+                    .rounding(egui::Rounding::same(8.0))
+                    .inner_margin(egui::Margin::symmetric(10.0, 4.0));
+                badge_frame.show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new(badge_text)
+                            .strong()
+                            .size(11.0)
+                            .color(badge_color),
+                    );
+                });
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(
+                        egui::RichText::new("⚡ Adaptive Engine: 0.00% CPU Standby")
+                            .small()
+                            .color(Color32::from_rgb(140, 160, 180)),
+                    );
+                });
+            });
+
+            ui.add_space(10.0);
+
+            ui.label(
+                egui::RichText::new("EasySMX X05 Pro is Currently Offline")
+                    .strong()
+                    .size(20.0)
+                    .color(Color32::WHITE),
+            );
+            ui.add_space(4.0);
+            ui.label(
+                egui::RichText::new(
+                    "The companion suite is paused in ultra-lean standby mode. Connect or wake your gamepad to immediately activate 1000Hz esports polling, live Hall-Effect radar, and all suite features.",
+                )
+                .size(13.0)
+                .color(Color32::from_rgb(170, 185, 205)),
+            );
+
+            ui.add_space(12.0);
+
+            ui.horizontal(|ui| {
+                let dot_pulse = (current_time * 3.5).sin() as f32 * 0.3 + 0.7;
+                let dot_c = Color32::from_rgb((255.0 * dot_pulse) as u8, (140.0 * dot_pulse) as u8, 0);
+                let (dot_rect, _) = ui.allocate_exact_size(Vec2::splat(10.0), egui::Sense::hover());
+                ui.painter().circle_filled(dot_rect.center(), 4.0, dot_c);
+                ui.label(
+                    egui::RichText::new("Actively monitoring USB and wireless ports... Connect controller to go ONLINE automatically.")
+                        .small()
+                        .color(Color32::from_rgb(255, 185, 50)),
+                );
+            });
+        });
+
+    ui.add_space(14.0);
+
+    ui.label(
+        egui::RichText::new("HOW TO CONNECT YOUR EASYSMX X05 PRO")
+            .size(11.0)
+            .strong()
+            .color(Color32::from_rgb(110, 130, 160)),
+    );
+    ui.add_space(6.0);
+
+    // 3 Quick Connection Cards
+    ui.columns(3, |cols| {
+        // Card 1: Wired USB
+        cols[0].group(|ui| {
+            ui.set_width(ui.available_width());
+            ui.label(
+                egui::RichText::new("⚡ Wired USB-C Mode")
+                    .strong()
+                    .size(13.5)
+                    .color(Color32::from_rgb(0, 240, 140)),
+            );
+            ui.add_space(4.0);
+            ui.label(
+                egui::RichText::new(
+                    "Plug USB-C cable directly to PC. Instantly locks into 1000Hz zero-latency esports mode and begins fast charging.",
+                )
+                .size(12.0)
+                .color(Color32::from_rgb(160, 175, 195)),
+            );
+        });
+
+        // Card 2: 2.4GHz Wireless
+        cols[1].group(|ui| {
+            ui.set_width(ui.available_width());
+            ui.label(
+                egui::RichText::new("📶 2.4GHz Wireless")
+                    .strong()
+                    .size(13.5)
+                    .color(Color32::from_rgb(0, 220, 255)),
+            );
+            ui.add_space(4.0);
+            ui.label(
+                egui::RichText::new(
+                    "Insert USB receiver dongle. Set back slider switch to 2.4G and hold HOME for 3s to wake/pair (LEDs pulse blue).",
+                )
+                .size(12.0)
+                .color(Color32::from_rgb(160, 175, 195)),
+            );
+        });
+
+        // Card 3: Bluetooth BLE
+        cols[2].group(|ui| {
+            ui.set_width(ui.available_width());
+            ui.label(
+                egui::RichText::new("📱 Bluetooth BLE")
+                    .strong()
+                    .size(13.5)
+                    .color(Color32::from_rgb(195, 140, 255)),
+            );
+            ui.add_space(4.0);
+            ui.label(
+                egui::RichText::new(
+                    "Set back slider switch to BT. Hold HOME for 3s (LEDs flash rapidly). Pair with 'Xbox Wireless Controller' in Windows.",
+                )
+                .size(12.0)
+                .color(Color32::from_rgb(160, 175, 195)),
+            );
+        });
+    });
+
+    ui.add_space(16.0);
+
+    // Bottom Navigation Quick Links
+    ui.horizontal(|ui| {
+        if ui.button(egui::RichText::new("📖 View Hardware Guide & Shortcuts").strong().size(13.0)).clicked() {
+            app.active_tab = Tab::EasySMXGuide;
+        }
+
+        ui.add_space(6.0);
+
+        if ui.button(egui::RichText::new("⚙️ Settings & System").strong().size(13.0)).clicked() {
+            app.active_tab = Tab::Settings;
+        }
+    });
 }
 
 // ----------------------------------------------------

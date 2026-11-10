@@ -154,6 +154,7 @@ pub struct SuiteApp {
     pub last_low_battery_alert: Option<Instant>,
     pub last_full_battery_alert: bool,
     pub last_wired_state: bool,
+    pub last_connected_state: Option<bool>,
     pub last_tray_update: Instant,
     pub last_minimized_state: bool,
     pub window_hidden: bool,
@@ -324,6 +325,7 @@ impl SuiteApp {
             last_low_battery_alert: None,
             last_full_battery_alert: false,
             last_wired_state: false,
+            last_connected_state: None,
             last_tray_update: Instant::now(),
             last_minimized_state: false,
             window_hidden: false,
@@ -439,6 +441,40 @@ impl eframe::App for SuiteApp {
             self.controller = state.clone();
         }
 
+        // Online / Offline state transitions & user feedback
+        let is_connected = self.controller.connected;
+        match self.last_connected_state {
+            None => {
+                self.last_connected_state = Some(is_connected);
+                if is_connected {
+                    self.set_status("Controller Connected: Suite is ONLINE (1000Hz).");
+                } else {
+                    self.set_status("Controller Disconnected: Suite is OFFLINE (Standby).");
+                }
+            }
+            Some(was_connected) => {
+                if is_connected && !was_connected {
+                    self.last_connected_state = Some(true);
+                    self.set_status("Controller Connected: Suite is now ONLINE!");
+                    tray::play_alert_sound(false);
+                    tray::show_balloon(
+                        "EasySMX X05 Pro - ONLINE",
+                        "Controller connected! Suite activated at 1000Hz esports polling.",
+                        false,
+                    );
+                } else if !is_connected && was_connected {
+                    self.last_connected_state = Some(false);
+                    self.stop_vibration();
+                    self.set_status("Controller Disconnected: Suite went OFFLINE (Standby Mode).");
+                    tray::show_balloon(
+                        "EasySMX X05 Pro - OFFLINE",
+                        "Controller disconnected. Suite paused in low-power standby mode.",
+                        false,
+                    );
+                }
+            }
+        }
+
         // Automatic non-blocking vibration pulse cutoff
         if let Some(until) = self.vibration_until {
             if Instant::now() >= until {
@@ -538,11 +574,11 @@ impl eframe::App for SuiteApp {
                     controller::ConnectionMode::Disconnected => "Offline",
                 };
                 let pct = self.controller.battery.estimated_percentage();
-                format!("EasySMX X05 Pro: {}% [{}]", pct, mode_str)
+                format!("EasySMX X05 Pro: ONLINE - {}% [{}]", pct, mode_str)
             } else if self.controller.is_dongle_present {
-                "EasySMX X05 Pro: 2.4G Standby (Press Home to wake)".to_string()
+                "EasySMX X05 Pro: OFFLINE (2.4G Standby)".to_string()
             } else {
-                "EasySMX X05 Pro: Disconnected".to_string()
+                "EasySMX X05 Pro: OFFLINE (Disconnected)".to_string()
             };
             tray::update_tooltip(tooltip);
         }
